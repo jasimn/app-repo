@@ -2,52 +2,84 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Docker Node MySQL Demo</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Simple 3-tier App</title>
   <style>
-    body { font-family: system-ui, -apple-system, Roboto, "Segoe UI", Arial; padding: 24px; }
-    h1 { color: #0b69ff; }
-    #users { margin-top: 12px; }
-    .user { padding: 6px 8px; border-bottom: 1px solid #eee; }
-    .hint { color: #666; font-size: 0.9rem; }
-    button { margin-top: 10px; padding: 8px 12px; }
+    body { font-family: Arial, Helvetica, sans-serif; max-width: 720px; margin: 36px auto; }
+    header { text-align:center; margin-bottom:20px; }
+    form { display:flex; gap:8px; margin-bottom:16px; }
+    input[type="text"] { flex:1; padding:8px; font-size:14px; }
+    button { padding:8px 12px; }
+    ul { padding-left:20px; }
+    .msg { color: #090; }
+    .err { color: #b00; }
   </style>
 </head>
 <body>
-  <h1>Docker Node + MySQL — Demo</h1>
-  <p class="hint">This static page is served by Nginx. It fetches users from the API at <code>/api/users</code>.</p>
+  <header>
+    <h1>Users (Frontend)</h1>
+    <p>Fetches from backend at <code>/api/users</code></p>
+  </header>
 
-  <button id="reloadBtn">Load users</button>
+  <form id="addForm">
+    <input id="name" placeholder="Name" required />
+    <input id="email" placeholder="Email" required />
+    <button type="submit">Add</button>
+  </form>
+
   <div id="status"></div>
-  <div id="users"></div>
+  <h3>Users</h3>
+  <ul id="users"></ul>
+<script>
+const apiBase = 'http://127.0.0.1:3000/api'; // IMPORTANT: Docker service name
 
-  <script>
-    const status = document.getElementById('status');
-    const usersDiv = document.getElementById('users');
-    const btn = document.getElementById('reloadBtn');
+async function fetchUsers(){
+  try{
+    const res = await fetch(`${apiBase}/users`);
+    if(!res.ok) throw new Error('Failed to fetch');
+    const users = await res.json();
+    const ul = document.getElementById('users');
+    ul.innerHTML = users.map(u=>`<li>${u.id}. ${escapeHtml(u.name)} — ${escapeHtml(u.email)}</li>`).join('');
+  }catch(e){
+    setStatus('Error loading users: '+e.message, true);
+  }
+}
 
-    async function loadUsers() {
-      status.textContent = 'Loading...';
-      usersDiv.innerHTML = '';
-      try {
-        const res = await fetch('/api/users', {cache: 'no-store'});
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        const data = await res.json();
-        if (!Array.isArray(data) || data.length === 0) {
-          usersDiv.innerHTML = '<div class="hint">No users found.</div>';
-        } else {
-          usersDiv.innerHTML = data.map(u => `<div class="user">${u.id}: ${u.name}</div>`).join('');
-        }
-        status.textContent = '';
-      } catch (err) {
-        status.textContent = 'Error: ' + err.message;
-        usersDiv.innerHTML = '<div class="hint">Cannot reach API. Is the backend running?</div>';
-      }
+function escapeHtml(s){ return String(s).replace(/[&<>"]/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c])); }
+
+function setStatus(msg, isError=false){
+  const s = document.getElementById('status');
+  s.className = isError ? 'err' : 'msg';
+  s.textContent = msg;
+  if(!isError) setTimeout(()=>s.textContent='', 3000);
+}
+
+document.getElementById('addForm').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const name = document.getElementById('name').value.trim();
+  const email = document.getElementById('email').value.trim();
+  if(!name||!email){ setStatus('Name and email required', true); return; }
+  try{
+    const res = await fetch(`${apiBase}/users`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ name, email })
+    });
+    if(!res.ok) {
+      const err = await res.text();
+      throw new Error(err || res.statusText);
     }
+    document.getElementById('name').value='';
+    document.getElementById('email').value='';
+    setStatus('User added');
+    await fetchUsers();
+  }catch(e){
+    setStatus('Add failed: '+e.message, true);
+  }
+});
 
-    btn.addEventListener('click', loadUsers);
-    // load on open
-    loadUsers();
-  </script>
+fetchUsers();
+</script>
+
 </body>
 </html>
