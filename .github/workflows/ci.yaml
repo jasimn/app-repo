@@ -52,7 +52,7 @@ jobs:
     # 6️⃣ Clone GitOps Repo
     - name: Clone GitOps Repo
       run: |
-        git clone https://${{ secrets.GITOPS_TOKEN }}@github.com/<you>/simple-3tier-gitops.git
+        git clone https://${{ secrets.GITOPS_TOKEN }}@github.com/jasimn/3tier-gitops.git
 
     # 7️⃣ Update Backend Image in GitOps Repo
     - name: Update Backend Manifest
