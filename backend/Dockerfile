@@ -1,18 +1,14 @@
-# Use Node.js base image
+# node:18-alpine is base image 
 FROM node:18-alpine
-
-# Set working directory
+# creating working inside container
 WORKDIR /app
-
-# Copy package.json and install dependencies
+# copy  packages inside the docker's working direcotry 
 COPY package*.json ./
-RUN npm install
-
-# Copy app source
+# installing dependencies
+RUN npm install  --production
+# copy  souce code into the container.
 COPY . .
-
-# Expose app port
+# exposing backened port 
 EXPOSE 3000
-
-# Start app
-CMD ["node", "server.js"]
+# starting the server
+CMD [ "node", "server.js" ]
