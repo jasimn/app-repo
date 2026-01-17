@@ -63,7 +63,7 @@ jobs:
     # 8️⃣ Update Frontend Image in GitOps Repo
     - name: Update Frontend Manifest
       run: |
-        cd simple-3tier-gitops
+        cd 3tier-gitops
         sed -i "s|image:.*frontend.*|image: $FRONTEND_IMAGE|" frontend/deployment.yaml
 
     # 9️⃣ Commit & Push GitOps Changes
