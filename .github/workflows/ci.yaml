@@ -57,7 +57,7 @@ jobs:
     # 7️⃣ Update Backend Image in GitOps Repo
     - name: Update Backend Manifest
       run: |
-        cd simple-3tier-gitops
+        cd 3tier-gitops
         sed -i "s|image:.*backend.*|image: $BACKEND_IMAGE|" backend/deployment.yaml
 
     # 8️⃣ Update Frontend Image in GitOps Repo
