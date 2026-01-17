@@ -14,11 +14,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1️⃣ Checkout source code
+    #  Checkout source code
     - name: Checkout code
       uses: actions/checkout@v4
 
-    # 2️⃣ Configure AWS credentials
+    #  Configure AWS credentials
     - name: Configure AWS
       uses: aws-actions/configure-aws-credentials@v4
       with:
@@ -26,14 +26,14 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.AWS_REGION }}
 
-    # 3️⃣ Login to Amazon ECR
+    #  Login to Amazon ECR
     - name: Login to ECR
       run: |
         aws ecr get-login-password --region $AWS_REGION | \
         docker login --username AWS --password-stdin \
         ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com
 
-    # 4️⃣ Build & Push Backend Image
+    #  Build & Push Backend Image
     - name: Build & Push Backend
       run: |
         BACKEND_IMAGE=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/backend:${{ github.sha }}
@@ -41,7 +41,7 @@ jobs:
         docker push $BACKEND_IMAGE
         echo "BACKEND_IMAGE=$BACKEND_IMAGE" >> $GITHUB_ENV
 
-    # 5️⃣ Build & Push Frontend Image
+    #  Build & Push Frontend Image
     - name: Build & Push Frontend
       run: |
         FRONTEND_IMAGE=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/frontend:${{ github.sha }}
@@ -49,28 +49,36 @@ jobs:
         docker push $FRONTEND_IMAGE
         echo "FRONTEND_IMAGE=$FRONTEND_IMAGE" >> $GITHUB_ENV
 
-    # 6️⃣ Clone GitOps Repo
+    #  Clone GitOps Repo
     - name: Clone GitOps Repo
       run: |
         git clone https://${{ secrets.GITOPS_TOKEN }}@github.com/jasimn/3tier-gitops.git
 
-    # 7️⃣ Update Backend Image in GitOps Repo
+    #  Update Backend Image in GitOps Repo
     - name: Update Backend Manifest
       run: |
         cd 3tier-gitops
         sed -i "s|image:.*backend.*|image: $BACKEND_IMAGE|" backend/deployment.yaml
 
-    # 8️⃣ Update Frontend Image in GitOps Repo
+    #  Update Frontend Image in GitOps Repo
     - name: Update Frontend Manifest
       run: |
         cd 3tier-gitops
         sed -i "s|image:.*frontend.*|image: $FRONTEND_IMAGE|" frontend/deployment.yaml
 
-    # 9️⃣ Commit & Push GitOps Changes
+    #  Commit & Push GitOps Changes
     - name: Commit and Push
       run: |
         cd 3tier-gitops
         git config user.email "jasimakhtar302@gmail.com"
         git config user.name "jasimn"
-        git commit -am "Update images to ${{ github.sha }}"
-        git push how to configure this 
+        git add .
+
+        if git diff --cached --quiet; then
+          echo "No changes to commit"
+          exit 0
+        fi
+
+        git commit -m "Update images to ${{ github.sha }}"
+        git push
+
