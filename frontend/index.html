@@ -3,22 +3,44 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Simple 3-tier App</title>
+  <title>Simple 3-Tier App</title>
+
   <style>
-    body { font-family: Arial, Helvetica, sans-serif; max-width: 720px; margin: 36px auto; }
-    header { text-align:center; margin-bottom:20px; }
-    form { display:flex; gap:8px; margin-bottom:16px; }
-    input[type="text"] { flex:1; padding:8px; font-size:14px; }
-    button { padding:8px 12px; }
-    ul { padding-left:20px; }
-    .msg { color: #090; }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      max-width: 720px;
+      margin: 36px auto;
+    }
+    header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    form {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    input {
+      flex: 1;
+      padding: 8px;
+      font-size: 14px;
+    }
+    button {
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+    ul {
+      padding-left: 20px;
+    }
+    .msg { color: #0a0; }
     .err { color: #b00; }
   </style>
 </head>
+
 <body>
   <header>
     <h1>Users (Frontend)</h1>
-    <p>Fetches from backend at <code>/api/users</code></p>
+    <p>Backend: <code>/api/users</code></p>
   </header>
 
   <form id="addForm">
@@ -28,57 +50,78 @@
   </form>
 
   <div id="status"></div>
+
   <h3>Users</h3>
   <ul id="users"></ul>
+
 <script>
-const apiBase = 'http://127.0.0.1:3000/api'; // IMPORTANT: Docker service name
+  // 🔥 PUBLIC BACKEND URL (LoadBalancer)
+  const apiBase =
+    'http://a9363934c54114be2abe622fd499c5ab-346726918.us-east-1.elb.amazonaws.com:3000/api';
 
-async function fetchUsers(){
-  try{
-    const res = await fetch(`${apiBase}/users`);
-    if(!res.ok) throw new Error('Failed to fetch');
-    const users = await res.json();
-    const ul = document.getElementById('users');
-    ul.innerHTML = users.map(u=>`<li>${u.id}. ${escapeHtml(u.name)} — ${escapeHtml(u.email)}</li>`).join('');
-  }catch(e){
-    setStatus('Error loading users: '+e.message, true);
-  }
-}
+  async function fetchUsers() {
+    try {
+      const res = await fetch(`${apiBase}/users`);
+      if (!res.ok) throw new Error('Failed to fetch users');
+      const users = await res.json();
 
-function escapeHtml(s){ return String(s).replace(/[&<>"]/g, c=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c])); }
-
-function setStatus(msg, isError=false){
-  const s = document.getElementById('status');
-  s.className = isError ? 'err' : 'msg';
-  s.textContent = msg;
-  if(!isError) setTimeout(()=>s.textContent='', 3000);
-}
-
-document.getElementById('addForm').addEventListener('submit', async (ev)=>{
-  ev.preventDefault();
-  const name = document.getElementById('name').value.trim();
-  const email = document.getElementById('email').value.trim();
-  if(!name||!email){ setStatus('Name and email required', true); return; }
-  try{
-    const res = await fetch(`${apiBase}/users`, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ name, email })
-    });
-    if(!res.ok) {
-      const err = await res.text();
-      throw new Error(err || res.statusText);
+      const ul = document.getElementById('users');
+      ul.innerHTML = users
+        .map(u => `<li>${u.id}. ${escapeHtml(u.name)} — ${escapeHtml(u.email)}</li>`)
+        .join('');
+    } catch (err) {
+      setStatus('Error loading users: ' + err.message, true);
     }
-    document.getElementById('name').value='';
-    document.getElementById('email').value='';
-    setStatus('User added');
-    await fetchUsers();
-  }catch(e){
-    setStatus('Add failed: '+e.message, true);
   }
-});
 
-fetchUsers();
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"]/g, c =>
+      ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c])
+    );
+  }
+
+  function setStatus(msg, isError = false) {
+    const el = document.getElementById('status');
+    el.className = isError ? 'err' : 'msg';
+    el.textContent = msg;
+    if (!isError) setTimeout(() => el.textContent = '', 3000);
+  }
+
+  document.getElementById('addForm').addEventListener('submit', async e => {
+    e.preventDefault();
+
+    const name = document.getElementById('name').value.trim();
+    const email = document.getElementById('email').value.trim();
+
+    if (!name || !email) {
+      setStatus('Name and email required', true);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${apiBase}/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email })
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || 'Failed to add user');
+      }
+
+      document.getElementById('name').value = '';
+      document.getElementById('email').value = '';
+
+      setStatus('User added successfully');
+      fetchUsers();
+    } catch (err) {
+      setStatus('Add failed: ' + err.message, true);
+    }
+  });
+
+  // initial load
+  fetchUsers();
 </script>
 
 </body>
