@@ -5,58 +5,99 @@ const cors = require('cors');
 
 const app = express();
 app.use(express.json());
-app.use(cors()); // allow frontend to talk to backend (adjust origin in prod)
+app.use(cors());
 
 const PORT = process.env.PORT || 3000;
 
 let pool;
-async function initDbPool(){
-  pool = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASS || '',
-    database: process.env.DB_NAME || 'simpleapp',
-    port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 3306,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-  });
-  // optional quick check
-  await pool.query('SELECT 1');
+
+/**
+ * Initialize MySQL connection with retry
+ * Required for Kubernetes startup ordering
+ */
+async function initDbPoolWithRetry(retries = 10, delayMs = 3000) {
+  for (let i = 1; i <= retries; i++) {
+    try {
+      pool = mysql.createPool({
+        host: process.env.DB_HOST || 'localhost',
+        user: process.env.DB_USER || 'root',
+        password: process.env.DB_PASS || '',
+        database: process.env.DB_NAME || 'simpleapp',
+        port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 3306,
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0
+      });
+
+      await pool.query('SELECT 1');
+      console.log('✅ Connected to MySQL');
+      return;
+    } catch (err) {
+      console.error(`❌ DB connection attempt ${i} failed: ${err.message}`);
+
+      if (i === retries) {
+        console.error('🚨 Max DB retries reached. Exiting.');
+        process.exit(1);
+      }
+
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
 }
 
-app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+/**
+ * Health endpoint (used by Kubernetes probes)
+ */
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
 
+/**
+ * Get users
+ */
 app.get('/api/users', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT id, name, email FROM users ORDER BY id ASC');
+    const [rows] = await pool.query(
+      'SELECT id, name, email FROM users ORDER BY id ASC'
+    );
     res.json(rows);
   } catch (err) {
     console.error(err);
-    res.status(500).send('db error');
+    res.status(500).send('Database error');
   }
 });
 
+/**
+ * Create user
+ */
 app.post('/api/users', async (req, res) => {
   try {
     const { name, email } = req.body;
-    if(!name || !email) return res.status(400).send('name and email required');
-    const [result] = await pool.query('INSERT INTO users (name, email) VALUES (?, ?)', [name, email]);
-    const newId = result.insertId;
-    const [rows] = await pool.query('SELECT id, name, email FROM users WHERE id = ?', [newId]);
+    if (!name || !email) {
+      return res.status(400).send('Name and email required');
+    }
+
+    const [result] = await pool.query(
+      'INSERT INTO users (name, email) VALUES (?, ?)',
+      [name, email]
+    );
+
+    const [rows] = await pool.query(
+      'SELECT id, name, email FROM users WHERE id = ?',
+      [result.insertId]
+    );
+
     res.status(201).json(rows[0]);
   } catch (err) {
     console.error(err);
-    res.status(500).send('db error');
+    res.status(500).send('Database error');
   }
 });
 
-app.listen(PORT, async () => {
-  try {
-    await initDbPool();
-    console.log(`Backend listening on port ${PORT}`);
-  } catch (err) {
-    console.error('Failed to initialize DB pool:', err);
-    process.exit(1);
-  }
+/**
+ * Start server immediately, then connect to DB
+ */
+app.listen(PORT, () => {
+  console.log(`🚀 Backend listening on port ${PORT}`);
+  initDbPoolWithRetry();
 });
