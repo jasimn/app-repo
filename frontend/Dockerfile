@@ -1,8 +1,14 @@
-# nginx is the base image
+# Use lightweight NGINX image
 FROM nginx:alpine
-# this creates default working directory in container
-WORKDIR /app
-# copy html,css,js file from host to container.
+
+# Remove default nginx website
+RUN rm -rf /usr/share/nginx/html/*
+
+# Copy frontend static files (index.html, css, js)
 COPY . /usr/share/nginx/html
-# expose port 80 for http traffic.
-EXPOSE  80
+
+# Expose HTTP port
+EXPOSE 80
+
+# Start NGINX
+CMD ["nginx", "-g", "daemon off;"]
