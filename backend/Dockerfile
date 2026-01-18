@@ -11,4 +11,4 @@ COPY . .
 # exposing backened port 
 EXPOSE 3000
 # starting the server
-CMD [ "node", "server.js" ]
+CMD [ "node", "index.js" ]
